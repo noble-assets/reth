@@ -44,7 +44,7 @@ use zstd::stream::read::Decoder as ZstdDecoder;
 
 const BYTE_UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
 const RETH_SNAPSHOTS_BASE_URL: &str = "https://snapshots-r2.reth.rs";
-const RETH_SNAPSHOTS_API_URL: &str = "https://snapshots.reth.rs/api/snapshots";
+const RETH_SNAPSHOTS_API_URL: &str = "https://snapshots.noble.xyz/662531/snapshots.json";
 const EXTENSION_TAR_LZ4: &str = ".tar.lz4";
 const EXTENSION_TAR_ZSTD: &str = ".tar.zst";
 const DOWNLOAD_CACHE_DIR: &str = ".download-cache";
