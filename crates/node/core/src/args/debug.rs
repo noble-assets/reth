@@ -40,15 +40,18 @@ pub struct DebugArgs {
     /// Runs a fake consensus client using blocks fetched from an RPC endpoint.
     /// Supports both HTTP and `WebSocket` endpoints - `WebSocket` endpoints will use
     /// subscriptions, while HTTP endpoints will poll for new blocks.
+    ///
+    /// Multiple comma-separated URLs enable ordered failover with staleness detection.
     #[arg(
         long = "debug.rpc-consensus-url",
         alias = "debug.rpc-consensus-ws",
         help_heading = "Debug",
         conflicts_with = "tip",
         conflicts_with = "etherscan",
-        value_name = "RPC_URL"
+        value_name = "RPC_URL",
+        value_delimiter = ','
     )]
-    pub rpc_consensus_url: Option<String>,
+    pub rpc_consensus_url: Option<Vec<String>>,
 
     /// If provided, the engine will skip `n` consecutive FCUs.
     #[arg(long = "debug.skip-fcu", help_heading = "Debug")]
