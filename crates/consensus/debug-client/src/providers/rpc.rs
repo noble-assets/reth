@@ -1,6 +1,8 @@
 use crate::BlockProvider;
 use alloy_provider::{ConnectionConfig, Network, Provider, ProviderBuilder, WebSocketConfig};
+use alloy_pubsub::FallbackPubSubConnect;
 use alloy_transport::TransportResult;
+use alloy_transport_ws::{WebSocketConfig as WsNativeConfig, WsConnect};
 use futures::{Stream, StreamExt};
 use reth_node_api::Block;
 use reth_tracing::tracing::{debug, warn};
@@ -41,6 +43,34 @@ impl<N: Network, PrimitiveBlock> RpcBlockProvider<N, PrimitiveBlock> {
             url: rpc_url.to_string(),
             convert: Arc::new(convert),
         })
+    }
+
+    /// Create a new RPC block provider that connects over WebSocket with fallback across
+    /// multiple URLs using [`FallbackPubSubConnect`].
+    pub async fn new_with_ws_fallback(
+        ws_urls: &[String],
+        convert: impl Fn(N::BlockResponse) -> PrimitiveBlock + Send + Sync + 'static,
+    ) -> eyre::Result<Self> {
+        let connectors: Vec<WsConnect> = ws_urls
+            .iter()
+            .map(|url| {
+                let mut ws_config = WsNativeConfig::default();
+                ws_config.max_frame_size = Some(128 * 1024 * 1024);
+                ws_config.max_message_size = Some(128 * 1024 * 1024);
+
+                WsConnect::new(url.clone())
+                    .with_config(ws_config)
+                    .with_max_retries(u32::MAX)
+            })
+            .collect();
+
+        let fallback = FallbackPubSubConnect::new(connectors);
+        let provider =
+            ProviderBuilder::default().connect_pubsub_with(fallback).await?;
+
+        let url = ws_urls.join(", ");
+
+        Ok(Self { provider: Arc::new(provider), url, convert: Arc::new(convert) })
     }
 
     /// Obtains a full block stream.

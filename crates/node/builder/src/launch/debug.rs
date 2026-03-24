@@ -187,29 +187,57 @@ where
                     async move { rpc_consensus_client.run().await },
                 );
             } else {
-                info!(target: "reth::cli", "Using RPC consensus client with {} fallback URLs", urls.len());
+                let all_ws = urls.iter().all(|u| u.starts_with("ws://") || u.starts_with("wss://"));
 
-                let block_provider = FallbackBlockProvider::<AnyNetwork, _>::new(
-                    urls,
-                    Duration::from_secs(30),
-                    |block_response| {
-                        let json = serde_json::to_value(block_response)
-                            .expect("Block serialization cannot fail");
-                        let rpc_block = serde_json::from_value(json)
-                            .expect("Block deserialization cannot fail");
-                        N::Types::rpc_to_primitive_block(rpc_block)
-                    },
-                );
+                if all_ws {
+                    info!(target: "reth::cli", "Using WS fallback consensus client with {} URLs", urls.len());
 
-                let rpc_consensus_client = DebugConsensusClient::new(
-                    handle.node.add_ons_handle.beacon_engine_handle.clone(),
-                    Arc::new(block_provider),
-                );
+                    let block_provider = RpcBlockProvider::<AnyNetwork, _>::new_with_ws_fallback(
+                        &urls,
+                        |block_response| {
+                            let json = serde_json::to_value(block_response)
+                                .expect("Block serialization cannot fail");
+                            let rpc_block = serde_json::from_value(json)
+                                .expect("Block deserialization cannot fail");
+                            N::Types::rpc_to_primitive_block(rpc_block)
+                        },
+                    )
+                    .await?;
 
-                handle.node.task_executor.spawn_critical(
-                    "fallback rpc consensus client",
-                    async move { rpc_consensus_client.run().await },
-                );
+                    let rpc_consensus_client = DebugConsensusClient::new(
+                        handle.node.add_ons_handle.beacon_engine_handle.clone(),
+                        Arc::new(block_provider),
+                    );
+
+                    handle.node.task_executor.spawn_critical(
+                        "ws fallback consensus client",
+                        async move { rpc_consensus_client.run().await },
+                    );
+                } else {
+                    info!(target: "reth::cli", "Using RPC consensus client with {} fallback URLs", urls.len());
+
+                    let block_provider = FallbackBlockProvider::<AnyNetwork, _>::new(
+                        urls,
+                        Duration::from_secs(30),
+                        |block_response| {
+                            let json = serde_json::to_value(block_response)
+                                .expect("Block serialization cannot fail");
+                            let rpc_block = serde_json::from_value(json)
+                                .expect("Block deserialization cannot fail");
+                            N::Types::rpc_to_primitive_block(rpc_block)
+                        },
+                    );
+
+                    let rpc_consensus_client = DebugConsensusClient::new(
+                        handle.node.add_ons_handle.beacon_engine_handle.clone(),
+                        Arc::new(block_provider),
+                    );
+
+                    handle.node.task_executor.spawn_critical(
+                        "fallback rpc consensus client",
+                        async move { rpc_consensus_client.run().await },
+                    );
+                }
             }
         }
 
